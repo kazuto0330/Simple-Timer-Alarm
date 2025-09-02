@@ -6,7 +6,10 @@
 </head>
 <body>
   <div class="header">
-    <h1>マルチタイマー</h1>
+    <div class="mode-selector">
+      <button id="timer-mode-btn" class="active">タイマー</button>
+      <button id="alarm-mode-btn">アラーム</button>
+    </div>
     <button id="add-timer-btn" title="タイマーを追加">+</button>
   </div>
   <div class="controls-container">
@@ -15,8 +18,13 @@
       <input type="range" id="volume-slider" min="0" max="100" title="音量">
     </div>
   </div>
-  <div id="timers-container">
-    <!-- ここにタイマーカードが追加されます -->
+  <div id="timer-section">
+    <div id="timers-container">
+      <!-- ここにタイマーカードが追加されます -->
+    </div>
+  </div>
+  <div id="alarm-section" style="display: none;">
+    <!-- ここにアラーム機能が追加されます -->
   </div>
   <script src="sidepanel.js"></script>
 </body>

@@ -6,12 +6,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const timersContainer = document.getElementById("timers-container");
   const addTimerBtn = document.getElementById("add-timer-btn");
   const volumeSlider = document.getElementById("volume-slider");
+  const timerModeBtn = document.getElementById("timer-mode-btn");
+  const alarmModeBtn = document.getElementById("alarm-mode-btn");
+  const timerSection = document.getElementById("timer-section");
+  const alarmSection = document.getElementById("alarm-section");
 
   let editingState = { id: null, type: null };
   let intervalId = null;
 
+  let currentMode = "timer";
+
+  timerModeBtn.addEventListener("click", () => switchMode("timer"));
+  alarmModeBtn.addEventListener("click", () => switchMode("alarm"));
+
+  function switchMode(mode) {
+    currentMode = mode;
+    if (mode === "timer") {
+      timerModeBtn.classList.add("active");
+      alarmModeBtn.classList.remove("active");
+      timerSection.style.display = "block";
+      alarmSection.style.display = "none";
+    } else {
+      timerModeBtn.classList.remove("active");
+      alarmModeBtn.classList.add("active");
+      timerSection.style.display = "none";
+      alarmSection.style.display = "block";
+    }
+    addTimerBtn.style.display = "block"; //常に表示
+  }
+
   chrome.storage.local.get("volume", ({ volume }) => { if (volume !== undefined) volumeSlider.value = volume; });
-  addTimerBtn.addEventListener("click", () => chrome.runtime.sendMessage({ command: "addTimer", data: { minutes: 3 } }));
+  addTimerBtn.addEventListener("click", () => {
+    if (currentMode === "timer") {
+      chrome.runtime.sendMessage({ command: "addTimer", data: { minutes: 3 } });
+    } else {
+      // アラームモードでの追加処理は後で実装
+    }
+  });
   volumeSlider.addEventListener("input", (e) => chrome.runtime.sendMessage({ command: "updateVolume", data: { volume: parseInt(e.target.value, 10) } }));
   
   chrome.runtime.onMessage.addListener((request) => {
