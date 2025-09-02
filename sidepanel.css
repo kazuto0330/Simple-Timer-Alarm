@@ -67,5 +67,5 @@ h1 { font-size: 1.4em; margin: 0; }
 }
 
 .play-pause-btn:hover { transform: scale(1.1); }
-.play-pause-btn.paused { background-image: url('chrome-extension://__MSG_@@extension_id__/saisei.png'); }
-.play-pause-btn.running { background-image: url('chrome-extension://__MSG_@@extension_id__/teisi.png'); }
+.play-pause-btn.paused { background-image: url('chrome-extension://__MSG_@@extension_id__/images/play.png'); }
+.play-pause-btn.running { background-image: url('chrome-extension://__MSG_@@extension_id__/images/pause.png'); }

@@ -34,7 +34,7 @@ body {
 
 #stop-sound-btn {
     background-color: transparent;
-    background-image: url('chrome-extension://__MSG_@@extension_id__/teisi.png');
+    background-image: url('chrome-extension://__MSG_@@extension_id__/images/pause.png');
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
