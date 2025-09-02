@@ -92,3 +92,33 @@ h1 { font-size: 1.4em; margin: 0; }
   background-color: var(--primary-color);
   color: white;
 }
+
+#alarms-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 15px;
+    overflow-y: auto;
+    flex-grow: 1;
+    padding-right: 5px;
+}
+
+.alarm-card {
+    background-color: var(--card-bg-color);
+    border-radius: 10px;
+    padding: 15px;
+    display: grid;
+    grid-template-areas:
+        "name delete"
+        "time time"
+        "actions actions";
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    border-left: 5px solid transparent;
+    transition: background-color 0.3s;
+}
+
+.alarm-card.active {
+    background-color: #2E4B3E; /* 薄い緑 */
+    border-left-color: var(--accent-color);
+}

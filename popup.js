@@ -2,20 +2,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const listElement = document.getElementById('finished-list');
     const stopBtn = document.getElementById('stop-sound-btn');
 
-    const renderList = (timers) => {
+    const renderList = (items) => {
         listElement.innerHTML = ''; // リストをクリア
-        if (timers && timers.length > 0) {
-            timers.forEach(timer => {
-                const item = document.createElement('div');
-                item.className = 'finished-item';
-                item.textContent = `「${timer.name}」`;
-                listElement.appendChild(item);
+        if (items && items.length > 0) {
+            items.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'finished-item';
+                if (item.type === 'alarm') {
+                    el.textContent = `「${item.name}」の時間です`;
+                } else {
+                    el.textContent = `「${item.name}」が終了しました`;
+                }
+                listElement.appendChild(el);
             });
             stopBtn.disabled = false;
         } else {
             const item = document.createElement('div');
             item.className = 'finished-item';
-            item.textContent = "終了したタイマーはありません";
+            item.textContent = "終了したタイマーやアラームはありません";
             listElement.appendChild(item);
             stopBtn.disabled = true;
         }
