@@ -6,6 +6,7 @@ chrome.runtime.onMessage.addListener((request) => {
     case 'playSound':
       audio.src = request.source;
       audio.volume = (request.volume !== undefined) ? request.volume / 100 : 0.5;
+      audio.loop = request.loop || false; // ループ設定を追加
       audio.play();
       break;
     case 'stopSound':

@@ -155,8 +155,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
 
     if (finishedItem) {
+        const isAlarm = finishedItem.type === 'alarm';
         if ((finishedTimers || []).length === 0) {
-            playSound(volume);
+            playSound(volume, isAlarm); // アラームの場合のみループ再生
         }
         const newFinishedList = [...(finishedTimers || []).filter(t => t.id !== finishedItem.id), finishedItem];
         storageUpdates.finishedTimers = newFinishedList;
@@ -166,10 +167,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         sendDataToSidePanel();
         chrome.runtime.sendMessage({ command: "updateFinishedList", data: newFinishedList }).catch(e=>{});
 
-        if (!isSidePanelOpen) {
-            await chrome.action.setPopup({ popup: 'popup.html' });
-            chrome.action.openPopup();
-        }
+        await chrome.action.setPopup({ popup: 'popup.html' });
+        chrome.action.openPopup();
     }
 });
 
@@ -205,4 +204,19 @@ function pauseTimer({ id }) { chrome.storage.local.get("timers", ({ timers = {} 
 function resumeTimer({ id }) { chrome.storage.local.get("timers", ({ timers = {} }) => { const timer = timers[id]; if (timer && !timer.isRunning) { const newEndTime = Date.now() + timer.remainingTime; timer.endTime = newEndTime; timer.isRunning = true; chrome.alarms.create(id, { when: newEndTime }); chrome.storage.local.set({ timers }, sendDataToSidePanel); } }); }
 function stopSound() { chrome.runtime.sendMessage({ command: 'stopSound' }).catch(e=>{}); }
 function updateVolume({ volume }) { chrome.storage.local.set({ volume }); }
-async function playSound(volume) { const source = 'sounds/sound.mp3'; const offscreenData = { command: 'playSound', source, volume }; if (await chrome.offscreen.hasDocument()) { chrome.runtime.sendMessage(offscreenData).catch(e=>{}); return; } await chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'タイマー終了を通知するため', }); setTimeout(() => { chrome.runtime.sendMessage(offscreenData).catch(e=>{}); }, 100); }
+async function playSound(volume, loop = false) {
+    const source = 'sounds/sound.mp3';
+    const offscreenData = { command: 'playSound', source, volume, loop };
+    if (await chrome.offscreen.hasDocument()) {
+        chrome.runtime.sendMessage(offscreenData).catch(e=>{});
+        return;
+    }
+    await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['AUDIO_PLAYBACK'],
+        justification: 'タイマー終了を通知するため',
+    });
+    setTimeout(() => {
+        chrome.runtime.sendMessage(offscreenData).catch(e=>{});
+    }, 100);
+}
