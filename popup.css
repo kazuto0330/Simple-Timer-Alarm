@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+
+:root {
+    --bg-color: #1e1e1e;
+    --card-bg-color: #2d2d2d;
+    --text-color: #e0e0e0;
+    --font-family: 'Noto Sans JP', sans-serif;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 15px;
+    min-width: 250px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.container { display: flex; flex-direction: column; gap: 15px; }
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.title {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 0;
+}
+
+#stop-sound-btn {
+    background-color: transparent;
+    background-image: url('chrome-extension://__MSG_@@extension_id__/teisi.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+#stop-sound-btn:hover { transform: scale(1.1); }
+
+#finished-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.finished-item {
+    background-color: var(--card-bg-color);
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 1em;
+}

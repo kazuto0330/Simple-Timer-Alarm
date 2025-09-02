@@ -1,0 +1,71 @@
+/* (前略) */
+:root { --bg-color: #1e1e1e; --card-bg-color: #2d2d2d; --text-color: #e0e0e0; --primary-color: #4dabf7; --danger-color: #c92a2a; --font-family: 'Noto Sans JP', sans-serif; }
+body, html { margin: 0; padding: 12px; font-family: var(--font-family); background-color: var(--bg-color); color: var(--text-color); width: 100%; box-sizing: border-box; }
+.header { display: flex; justify-content: space-between; align-items: center; }
+h1 { font-size: 1.4em; margin: 0; }
+#add-timer-btn { font-size: 24px; font-weight: bold; width: 40px; height: 40px; border-radius: 50%; border: none; background-color: var(--primary-color); color: white; cursor: pointer; transition: background-color 0.2s; }
+#add-timer-btn:hover { background-color: #1e90ff; }
+.controls-container { padding: 15px 5px; }
+.volume-control { display: flex; align-items: center; gap: 10px; }
+.volume-icon { font-size: 1.2em; }
+#volume-slider { width: 100%; cursor: pointer; }
+#timers-container { display: flex; flex-direction: column; gap: 15px; }
+
+.timer-card {
+  background-color: var(--card-bg-color);
+  border-radius: 10px;
+  padding: 15px;
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "name delete"
+    "time actions";
+  gap: 10px 15px;
+  transition: background-color 0.3s;
+}
+
+/* ★終了したタイマーのスタイル */
+.timer-card.finished {
+    background-color: var(--danger-color);
+}
+
+.timer-card.finished .timer-name,
+.timer-card.finished .timer-display,
+.timer-card.finished .delete-timer {
+    color: white;
+}
+
+.timer-card.finished .timer-name:hover,
+.timer-card.finished .timer-display:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+
+.timer-name { grid-area: name; font-weight: bold; font-size: 1.1em; cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: background-color 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timer-name:hover { background-color: rgba(255, 255, 255, 0.1); }
+.timer-name-input { grid-area: name; font-family: var(--font-family); font-weight: bold; font-size: 1.1em; color: var(--text-color); background-color: rgba(0, 0, 0, 0.2); border: 1px solid var(--primary-color); border-radius: 3px; padding: 2px 4px; width: 100%; box-sizing: border-box; }
+.delete-timer { grid-area: delete; background: none; border: none; color: #888; font-size: 18px; cursor: pointer; transition: color 0.2s; justify-self: end; }
+.delete-timer:hover { color: var(--danger-color); }
+.timer-display { grid-area: time; font-size: 2.8em; font-weight: 700; color: var(--text-color); cursor: pointer; border-radius: 5px; transition: background-color 0.2s; align-self: center; }
+.timer-display:hover { background-color: rgba(255, 255, 255, 0.1); }
+.timer-display-input { grid-area: time; font-family: var(--font-family); font-size: 2.8em; font-weight: 700; color: var(--text-color); background-color: rgba(0, 0, 0, 0.2); border: 1px solid var(--primary-color); text-align: center; width: 100%; box-sizing: border-box; border-radius: 5px; }
+.timer-actions { grid-area: actions; display: flex; align-items: center; justify-content: flex-end; }
+
+.play-pause-btn {
+    background-color: transparent;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.play-pause-btn:hover { transform: scale(1.1); }
+.play-pause-btn.paused { background-image: url('chrome-extension://__MSG_@@extension_id__/saisei.png'); }
+.play-pause-btn.running { background-image: url('chrome-extension://__MSG_@@extension_id__/teisi.png'); }
