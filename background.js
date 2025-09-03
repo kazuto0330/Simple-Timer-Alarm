@@ -16,6 +16,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     getFinishedTimers: (d, r) => chrome.storage.local.get('finishedTimers', (res) => r({ success: true, data: res.finishedTimers })),
     resetFinishedTimers,
     addAlarm, deleteAlarm, updateAlarmTime, updateAlarmName, toggleAlarm,
+    resetFinishedAlarm, // ★ 追加
   };
   if (actions[command]) {
     actions[command](data, sendResponse);
@@ -40,12 +41,19 @@ function addAlarm() {
   });
 }
 
-function deleteAlarm({ id }) {
-  chrome.storage.local.get("alarms", ({ alarms = {} }) => {
-    delete alarms[id];
-    chrome.storage.local.set({ alarms }, sendDataToSidePanel);
-    chrome.alarms.clear(id);
-  });
+async function deleteAlarm({ id }) {
+  const { alarms, finishedTimers } = await chrome.storage.local.get(["alarms", "finishedTimers"]);
+  delete alarms[id];
+  const updatedFinished = (finishedTimers || []).filter(t => t.id !== id);
+  
+  await chrome.storage.local.set({ alarms, finishedTimers: updatedFinished });
+  sendDataToSidePanel();
+  chrome.alarms.clear(id);
+
+  if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
+    stopSound();
+    await chrome.action.setPopup({ popup: '' });
+  }
 }
 
 function updateAlarmTime({ id, time }) {
@@ -54,7 +62,6 @@ function updateAlarmTime({ id, time }) {
             alarms[id].time = time;
             chrome.storage.local.set({ alarms }, () => {
                 if (alarms[id].isActive) {
-                    // アラームを再設定
                     toggleAlarm({ id, isActive: true });
                 } else {
                     sendDataToSidePanel();
@@ -80,7 +87,7 @@ function toggleAlarm({ id, isActive }) {
             alarm.isActive = isActive;
             chrome.storage.local.set({ alarms }, sendDataToSidePanel);
 
-            chrome.alarms.clear(id); // 既存のアラームをクリア
+            chrome.alarms.clear(id); 
 
             if (isActive) {
                 const [hours, minutes] = alarm.time.split(':').map(Number);
@@ -88,14 +95,13 @@ function toggleAlarm({ id, isActive }) {
                 const alarmTime = new Date();
                 alarmTime.setHours(hours, minutes, 0, 0);
 
-                // もし設定時刻が過去なら、次の日の同じ時刻に設定
                 if (alarmTime < now) {
                     alarmTime.setDate(alarmTime.getDate() + 1);
                 }
                 
                 chrome.alarms.create(id, {
                     when: alarmTime.getTime(),
-                    periodInMinutes: 24 * 60 // 24時間ごとに繰り返す
+                    periodInMinutes: 24 * 60
                 });
             }
         }
@@ -110,8 +116,9 @@ async function deleteTimer({ id }) {
   await chrome.storage.local.set({ timers, finishedTimers: updatedFinished });
   sendDataToSidePanel();
   chrome.alarms.clear(id);
-  if (updatedFinished.length === 0) {
+  if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
     stopSound();
+    await chrome.action.setPopup({ popup: '' });
   }
 }
 
@@ -124,8 +131,9 @@ async function resetTimer({ id }) {
         const updatedFinished = (finishedTimers || []).filter(t => t.id !== id);
         await chrome.storage.local.set({ timers, finishedTimers: updatedFinished });
         sendDataToSidePanel();
-        if (updatedFinished.length === 0) {
+        if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
             stopSound();
+            await chrome.action.setPopup({ popup: '' });
         }
     }
 }
@@ -149,7 +157,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     } else if (alarm.name.startsWith('alarm_')) {
         const userAlarm = alarms[alarm.name];
         if (userAlarm && userAlarm.isActive) {
-            // 繰り返しのアラームなので、アラームの状態は変更しない
             finishedItem = { id: userAlarm.id, name: userAlarm.name, type: 'alarm' };
         }
     }
@@ -157,7 +164,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (finishedItem) {
         const isAlarm = finishedItem.type === 'alarm';
         if ((finishedTimers || []).length === 0) {
-            playSound(volume, isAlarm); // アラームの場合のみループ再生
+            playSound(volume, isAlarm);
         }
         const newFinishedList = [...(finishedTimers || []).filter(t => t.id !== finishedItem.id), finishedItem];
         storageUpdates.finishedTimers = newFinishedList;
@@ -187,6 +194,18 @@ async function resetFinishedTimers() {
         stopSound();
     }
     await chrome.action.setPopup({ popup: '' });
+}
+
+// ★ 新設
+async function resetFinishedAlarm({ id }) {
+    const { finishedTimers } = await chrome.storage.local.get(["finishedTimers"]);
+    const updatedFinished = (finishedTimers || []).filter(t => t.id !== id);
+    await chrome.storage.local.set({ finishedTimers: updatedFinished });
+    sendDataToSidePanel();
+    if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
+        stopSound();
+        await chrome.action.setPopup({ popup: '' });
+    }
 }
 
 function sendDataToSidePanel() {

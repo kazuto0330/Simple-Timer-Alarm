@@ -121,3 +121,50 @@ h1 { font-size: 1.4em; margin: 0; }
     background-color: #2E4B3E; /* 薄い緑 */
     border-left-color: var(--accent-color);
 }
+
+/* 終了セクションのスタイル */
+#finished-section {
+  background-color: var(--card-bg-color);
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#finished-timers-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 15px 0;
+  color: var(--text-color);
+  font-size: 1em;
+}
+
+#finished-timers-list li {
+  padding: 5px 0;
+  border-bottom: 1px solid #444;
+}
+
+#finished-timers-list li:last-child {
+  border-bottom: none;
+}
+
+/* すべて停止ボタンのスタイル */
+#stop-all-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.1em;
+  font-weight: bold;
+  color: white;
+  background-color: var(--danger-color);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+#stop-all-btn:hover {
+  background-color: #a52323; /* 少し暗い赤 */
+}

@@ -11,10 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const timerSection = document.getElementById("timer-section");
   const alarmSection = document.getElementById("alarm-section");
   const alarmsContainer = document.getElementById("alarms-container");
+  
+  const finishedSection = document.getElementById('finished-section');
+  const finishedList = document.getElementById('finished-timers-list');
+  const stopAllBtn = document.getElementById('stop-all-btn');
 
   let editingState = { id: null, type: null };
   let intervalId = null;
-
   let currentMode = "timer";
 
   timerModeBtn.addEventListener("click", () => switchMode("timer"));
@@ -33,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
       timerSection.style.display = "none";
       alarmSection.style.display = "block";
     }
-    addTimerBtn.style.display = "block"; //常に表示
+    addTimerBtn.style.display = "block";
   }
 
   chrome.storage.local.get("volume", ({ volume }) => { if (volume !== undefined) volumeSlider.value = volume; });
@@ -48,12 +51,16 @@ document.addEventListener('DOMContentLoaded', () => {
   
   chrome.runtime.onMessage.addListener((request) => {
     if (request.command === "updateData") {
-      renderTimers(request.data.timers, request.data.finishedTimers);
-      renderAlarms(request.data.alarms);
+      const { timers, alarms, finishedTimers } = request.data;
+      renderTimers(timers, finishedTimers);
+      renderAlarms(alarms, finishedTimers); // ★ finishedTimers を渡す
+      renderFinishedTimers(finishedTimers);
     }
   });
 
-  function renderAlarms(alarms) {
+  // ★ renderAlarms が finishedTimers を受け取るように変更
+  function renderAlarms(alarms, finishedTimers) {
+    const finishedIds = new Set((finishedTimers || []).map(t => t.id));
     const existingCards = new Map();
     alarmsContainer.querySelectorAll('.alarm-card').forEach(card => existingCards.set(card.dataset.id, card));
     const renderedIds = new Set();
@@ -63,11 +70,12 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const id of sortedIds) {
         renderedIds.add(id);
         const alarm = alarms[id];
+        const isFinished = finishedIds.has(id);
         if (editingState.id === id) continue;
         if (existingCards.has(id)) {
-            updateAlarmCard(existingCards.get(id), alarm);
+            updateAlarmCard(existingCards.get(id), alarm, isFinished);
         } else {
-            const newCard = createAlarmCard(alarm);
+            const newCard = createAlarmCard(alarm, isFinished);
             alarmsContainer.appendChild(newCard);
         }
     }
@@ -75,47 +83,59 @@ document.addEventListener('DOMContentLoaded', () => {
     existingCards.forEach((card, id) => { if (!renderedIds.has(id)) card.remove(); });
   }
 
-  function createAlarmCard(alarm) {
+  // ★ createAlarmCard が isFinished を受け取るように変更
+  function createAlarmCard(alarm, isFinished) {
       const card = document.createElement("div");
       card.className = "alarm-card";
       card.dataset.id = alarm.id;
-      updateAlarmCard(card, alarm);
+      updateAlarmCard(card, alarm, isFinished);
       return card;
   }
 
-  function updateAlarmCard(card, alarm) {
+  // ★ updateAlarmCard が isFinished を受け取るように変更
+  function updateAlarmCard(card, alarm, isFinished) {
       card.classList.toggle('active', alarm.isActive);
+      card.classList.toggle('finished', isFinished);
+      const playPauseClass = isFinished ? 'running' : (alarm.isActive ? 'running' : 'paused');
       card.innerHTML = `
         <div class="timer-name" data-id="${alarm.id}">${escapeHTML(alarm.name)}</div>
         <button class="delete-timer" data-id="${alarm.id}">×</button>
         <div class="timer-display" data-id="${alarm.id}">${alarm.time}</div>
         <div class="timer-actions">
-          <button class="play-pause-btn ${alarm.isActive ? 'running' : 'paused'}" data-id="${alarm.id}"></button>
+          <button class="play-pause-btn ${playPauseClass}" data-id="${alarm.id}"></button>
         </div>
       `;
-      addEventListenersToAlarmCard(card, alarm);
+      addEventListenersToAlarmCard(card, alarm, isFinished);
   }
 
-  function addEventListenersToAlarmCard(card, alarm) {
+  // ★ addEventListenersToAlarmCard が isFinished を受け取るように変更
+  function addEventListenersToAlarmCard(card, alarm, isFinished) {
     card.querySelector('.delete-timer').addEventListener('click', (e) => {
         e.stopPropagation();
         chrome.runtime.sendMessage({ command: "deleteAlarm", data: { id: alarm.id } });
     }, { once: true });
 
+    // ★ isFinished に応じてコマンドを切り替える
     card.querySelector('.play-pause-btn').addEventListener('click', (e) => {
         e.stopPropagation();
-        chrome.runtime.sendMessage({ command: "toggleAlarm", data: { id: alarm.id, isActive: !alarm.isActive } });
+        if (isFinished) {
+            chrome.runtime.sendMessage({ command: "resetFinishedAlarm", data: { id: alarm.id } });
+        } else {
+            chrome.runtime.sendMessage({ command: "toggleAlarm", data: { id: alarm.id, isActive: !alarm.isActive } });
+        }
     }, { once: true });
 
-    card.querySelector('.timer-name').addEventListener('click', (e) => {
-        e.stopPropagation();
-        makeEditable(e.currentTarget, 'alarm-name');
-    }, { once: true });
+    if (!isFinished) {
+        card.querySelector('.timer-name').addEventListener('click', (e) => {
+            e.stopPropagation();
+            makeEditable(e.currentTarget, 'alarm-name');
+        }, { once: true });
 
-    card.querySelector('.timer-display').addEventListener('click', (e) => {
-        e.stopPropagation();
-        makeEditable(e.currentTarget, 'alarm-time');
-    }, { once: true });
+        card.querySelector('.timer-display').addEventListener('click', (e) => {
+            e.stopPropagation();
+            makeEditable(e.currentTarget, 'alarm-time');
+        }, { once: true });
+    }
   }
 
   function renderTimers(timers, finishedTimers) {
@@ -181,7 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ★ handleDelete, handlePlayPauseを修正
   function handleDelete(e, timer) {
     e.stopPropagation();
     chrome.runtime.sendMessage({ command: "deleteTimer", data: { id: timer.id } });
@@ -201,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ command, data: { id } });
   }
 
-  // (以降の関数は変更なし)
   function handleNameClick(e) { e.stopPropagation(); makeEditable(e.currentTarget, 'name'); }
   function handleTimeClick(e) { e.stopPropagation(); makeEditable(e.currentTarget, 'time'); }
   function makeEditable(element, type) { 
@@ -274,5 +292,29 @@ document.addEventListener('DOMContentLoaded', () => {
   function formatTime(ms) { if (ms < 0) ms = 0; const totalSeconds = Math.floor(ms / 1000); const h = Math.floor(totalSeconds / 3600); const m = Math.floor((totalSeconds % 3600) / 60); const s = totalSeconds % 60; if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; }
   function escapeHTML(str) { const p = document.createElement("p"); p.textContent = str; return p.innerHTML; }
   function requestDataUpdate() { chrome.runtime.sendMessage({ command: "getTimers" }); }
+  
+  function renderFinishedTimers(items) {
+    if (!finishedList) return;
+    finishedList.innerHTML = '';
+    if (items && items.length > 0) {
+        items.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item.type === 'timer' 
+                ? `タイマー「${escapeHTML(item.name)}」が終了しました`
+                : `アラーム「${escapeHTML(item.name)}」の時間です`;
+            finishedList.appendChild(li);
+        });
+        finishedSection.style.display = 'block';
+    } else {
+        finishedSection.style.display = 'none';
+    }
+  }
+
+  if (stopAllBtn) {
+    stopAllBtn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ command: "resetFinishedTimers" });
+    });
+  }
+
   requestDataUpdate();
 });
