@@ -102,7 +102,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <button class="delete-timer" data-id="${alarm.id}">×</button>
         <div class="timer-display" data-id="${alarm.id}">${alarm.time}</div>
         <div class="timer-actions">
-          <button class="play-pause-btn ${playPauseClass}" data-id="${alarm.id}"></button>
+          <label class="toggle-switch">
+            <input type="checkbox" class="alarm-toggle" data-id="${alarm.id}" ${alarm.isActive ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
         </div>
       `;
       addEventListenersToAlarmCard(card, alarm, isFinished);
@@ -115,13 +118,12 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.runtime.sendMessage({ command: "deleteAlarm", data: { id: alarm.id } });
     }, { once: true });
 
-    // ★ isFinished に応じてコマンドを切り替える
-    card.querySelector('.play-pause-btn').addEventListener('click', (e) => {
+    card.querySelector('.alarm-toggle').addEventListener('change', (e) => {
         e.stopPropagation();
         if (isFinished) {
             chrome.runtime.sendMessage({ command: "resetFinishedAlarm", data: { id: alarm.id } });
         } else {
-            chrome.runtime.sendMessage({ command: "toggleAlarm", data: { id: alarm.id, isActive: !alarm.isActive } });
+            chrome.runtime.sendMessage({ command: "toggleAlarm", data: { id: alarm.id, isActive: e.target.checked } });
         }
     }, { once: true });
 

@@ -105,7 +105,7 @@ h1 { font-size: 1.4em; margin: 0; }
 .alarm-card {
     background-color: var(--card-bg-color);
     border-radius: 10px;
-    padding: 15px;
+    padding: 15px 10px;
     display: grid;
     grid-template-areas:
         "name delete"
@@ -167,4 +167,50 @@ h1 { font-size: 1.4em; margin: 0; }
 
 #stop-all-btn:hover {
   background-color: #a52323; /* 少し暗い赤 */
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #555;
+  transition: .4s;
+  border-radius: 28px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: #aaa;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #417960;
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
 }
