@@ -26,6 +26,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
+const onFocusChanged = async (windowId) => {
+    if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+        try {
+            const { finishedTimers } = await chrome.storage.local.get("finishedTimers");
+            if (finishedTimers && finishedTimers.length > 0) {
+                await chrome.action.setPopup({ popup: 'popup.html' });
+                await chrome.action.openPopup();
+
+                // ポップアップ表示に成功したらバッジを消してリスナーを削除
+                await chrome.action.setBadgeText({ text: '' });
+                chrome.windows.onFocusChanged.removeListener(onFocusChanged);
+            } else {
+                // 完了タイマーがないならリスナーを削除
+                chrome.windows.onFocusChanged.removeListener(onFocusChanged);
+            }
+        } catch (e) {
+            console.error("onFocusChanged: ポップアップの再表示に失敗しました。", e);
+            // 再試行しても失敗する場合は、ループを防ぐためにリスナーを削除する。
+            // バッジは残るのでユーザーは通知に気づける
+            chrome.windows.onFocusChanged.removeListener(onFocusChanged);
+        }
+    }
+};
+
+async function clearFinishedState() {
+    stopSound();
+    await chrome.action.setPopup({ popup: '' });
+    await chrome.action.setBadgeText({ text: '' });
+    if (chrome.windows.onFocusChanged.hasListener(onFocusChanged)) {
+        chrome.windows.onFocusChanged.removeListener(onFocusChanged);
+    }
+}
+
 // --- アラーム操作 ---
 function addAlarm() {
   chrome.storage.local.get("alarms", ({ alarms = {} }) => {
@@ -51,8 +84,7 @@ async function deleteAlarm({ id }) {
   chrome.alarms.clear(id);
 
   if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
-    stopSound();
-    await chrome.action.setPopup({ popup: '' });
+    await clearFinishedState();
   }
 }
 
@@ -117,8 +149,7 @@ async function deleteTimer({ id }) {
   sendDataToSidePanel();
   chrome.alarms.clear(id);
   if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
-    stopSound();
-    await chrome.action.setPopup({ popup: '' });
+    await clearFinishedState();
   }
 }
 
@@ -132,8 +163,7 @@ async function resetTimer({ id }) {
         await chrome.storage.local.set({ timers, finishedTimers: updatedFinished });
         sendDataToSidePanel();
         if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
-            stopSound();
-            await chrome.action.setPopup({ popup: '' });
+            await clearFinishedState();
         }
     }
 }
@@ -174,8 +204,23 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         sendDataToSidePanel();
         chrome.runtime.sendMessage({ command: "updateFinishedList", data: newFinishedList }).catch(e=>{});
 
-        await chrome.action.setPopup({ popup: 'popup.html' });
-        chrome.action.openPopup();
+        try {
+            await chrome.action.setPopup({ popup: 'popup.html' });
+            await chrome.action.openPopup();
+        } catch (e) {
+            if (e.message.includes("Could not find an active browser window")) {
+                console.log("アクティブなウィンドウがないためポップアップを開けませんでした。フォーカス時に再試行します。");
+                // 代替案としてバッジを表示
+                await chrome.action.setBadgeText({ text: '!' });
+                await chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
+
+                if (!chrome.windows.onFocusChanged.hasListener(onFocusChanged)) {
+                    chrome.windows.onFocusChanged.addListener(onFocusChanged);
+                }
+            } else {
+                console.error("ポップアップを開けませんでした:", e);
+            }
+        }
     }
 });
 
@@ -194,9 +239,8 @@ async function resetFinishedTimers() {
         });
         await chrome.storage.local.set({ timers, alarms, finishedTimers: [] });
         sendDataToSidePanel();
-        stopSound();
     }
-    await chrome.action.setPopup({ popup: '' });
+    await clearFinishedState();
 }
 
 // ★ 新設
@@ -213,8 +257,7 @@ async function resetFinishedAlarm({ id }) {
     sendDataToSidePanel();
 
     if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
-        stopSound();
-        await chrome.action.setPopup({ popup: '' });
+        await clearFinishedState();
     }
 }
 
