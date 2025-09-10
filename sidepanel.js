@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const timerSection = document.getElementById("timer-section");
   const alarmSection = document.getElementById("alarm-section");
   const alarmsContainer = document.getElementById("alarms-container");
+  const nextAlarmMessage = document.getElementById('next-alarm-message');
   
   const finishedSection = document.getElementById('finished-section');
   const finishedList = document.getElementById('finished-timers-list');
@@ -19,12 +20,21 @@ document.addEventListener('DOMContentLoaded', () => {
   let editingState = { id: null, type: null };
   let intervalId = null;
   let currentMode = "timer";
+  let allTimers = {};
+  let allAlarms = {};
 
   timerModeBtn.addEventListener("click", () => switchMode("timer"));
   alarmModeBtn.addEventListener("click", () => switchMode("alarm"));
 
+  chrome.storage.local.get("lastActiveMode", ({ lastActiveMode }) => {
+    if (lastActiveMode) {
+      switchMode(lastActiveMode);
+    }
+  });
+
   function switchMode(mode) {
     currentMode = mode;
+    chrome.storage.local.set({ lastActiveMode: mode });
     if (mode === "timer") {
       timerModeBtn.classList.add("active");
       alarmModeBtn.classList.remove("active");
@@ -52,13 +62,94 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.runtime.onMessage.addListener((request) => {
     if (request.command === "updateData") {
       const { timers, alarms, finishedTimers } = request.data;
-      renderTimers(timers, finishedTimers);
-      renderAlarms(alarms, finishedTimers); // ★ finishedTimers を渡す
+      allTimers = timers || {};
+      allAlarms = alarms || {};
+      renderTimers(allTimers, finishedTimers);
+      renderAlarms(allAlarms, finishedTimers);
       renderFinishedTimers(finishedTimers);
+      updateNextAlarmMessage();
+      updateInterval();
     }
   });
 
-  // ★ renderAlarms が finishedTimers を受け取るように変更
+  function updateInterval() {
+    const hasRunningTimers = Object.values(allTimers).some(t => t.isRunning);
+    const hasActiveAlarms = Object.values(allAlarms).some(a => a.isActive);
+
+    if ((hasRunningTimers || hasActiveAlarms) && !intervalId) {
+        intervalId = setInterval(updateDynamicDisplays, 1000);
+    } else if (!(hasRunningTimers || hasActiveAlarms) && intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+    }
+  }
+
+  function updateDynamicDisplays() {
+      document.querySelectorAll('.timer-card').forEach(card => {
+          const timerId = card.dataset.id;
+          const timer = allTimers[timerId];
+          if (timer && timer.isRunning) {
+              const display = card.querySelector('.timer-display');
+              if (display) {
+                  const remainingMs = timer.endTime - Date.now();
+                  display.textContent = formatTime(remainingMs);
+              }
+          }
+      });
+      updateNextAlarmMessage();
+  }
+
+  function updateNextAlarmMessage() {
+    const nextAlarmMessage = document.getElementById('next-alarm-message');
+    const now = new Date();
+    let nextAlarm = null;
+    let minTimeDiff = Infinity;
+
+    Object.values(allAlarms).forEach(alarm => {
+        if (alarm.isActive) {
+            const [hours, minutes] = alarm.time.split(':').map(Number);
+            const alarmTime = new Date();
+            alarmTime.setHours(hours, minutes, 0, 0);
+
+            if (alarmTime < now) {
+                alarmTime.setDate(alarmTime.getDate() + 1);
+            }
+
+            const timeDiff = alarmTime.getTime() - now.getTime();
+            if (timeDiff > 0 && timeDiff < minTimeDiff) {
+                minTimeDiff = timeDiff;
+                nextAlarm = alarm;
+            }
+        }
+    });
+
+    if (nextAlarm) {
+        const totalMinutes = Math.ceil(minTimeDiff / (1000 * 60));
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+
+        let timeString = '';
+        if (h > 0) {
+            timeString += `${h}時間`;
+        }
+        if (m > 0) {
+            timeString += `${m}分`;
+        }
+        
+        if (timeString === '') {
+            timeString = '1分未満';
+        }
+
+        nextAlarmMessage.innerHTML = `
+          <div class="next-alarm-name">”${escapeHTML(nextAlarm.name)}”</div>
+          <div class="next-alarm-time">が${timeString}後に設定されています。</div>
+        `;
+        nextAlarmMessage.classList.add('visible');
+    } else {
+        nextAlarmMessage.classList.remove('visible');
+    }
+  }
+
   function renderAlarms(alarms, finishedTimers) {
     const finishedIds = new Set((finishedTimers || []).map(t => t.id));
     const existingCards = new Map();
@@ -83,7 +174,6 @@ document.addEventListener('DOMContentLoaded', () => {
     existingCards.forEach((card, id) => { if (!renderedIds.has(id)) card.remove(); });
   }
 
-  // ★ createAlarmCard が isFinished を受け取るように変更
   function createAlarmCard(alarm, isFinished) {
       const card = document.createElement("div");
       card.className = "alarm-card";
@@ -92,11 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return card;
   }
 
-  // ★ updateAlarmCard が isFinished を受け取るように変更
   function updateAlarmCard(card, alarm, isFinished) {
       card.classList.toggle('active', alarm.isActive);
       card.classList.toggle('finished', isFinished);
-      const playPauseClass = isFinished ? 'running' : (alarm.isActive ? 'running' : 'paused');
       card.innerHTML = `
         <div class="timer-name" data-id="${alarm.id}">${escapeHTML(alarm.name)}</div>
         <button class="delete-timer" data-id="${alarm.id}">×</button>
@@ -111,7 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
       addEventListenersToAlarmCard(card, alarm, isFinished);
   }
 
-  // ★ addEventListenersToAlarmCard が isFinished を受け取るように変更
   function addEventListenersToAlarmCard(card, alarm, isFinished) {
     card.querySelector('.delete-timer').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -142,14 +229,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderTimers(timers, finishedTimers) {
     const finishedIds = new Set((finishedTimers || []).map(t => t.id));
-    const hasRunningTimers = Object.values(timers).some(t => t.isRunning);
-    if (hasRunningTimers && !intervalId) {
-      intervalId = setInterval(requestDataUpdate, 1000);
-    } else if (!hasRunningTimers && intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-
     const sortedIds = Object.keys(timers).sort((a, b) => a.localeCompare(b));
     const existingCards = new Map();
     timersContainer.querySelectorAll('.timer-card').forEach(card => existingCards.set(card.dataset.id, card));
