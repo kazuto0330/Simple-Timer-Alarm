@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 初期表示
-    chrome.runtime.sendMessage({ command: "getFinishedTimers" }, (response) => {
+    chrome.runtime.sendMessage({ command: "getFinishedItems" }, (response) => {
         if (response && response.success) {
             renderList(response.data);
         }
@@ -41,8 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ボタンのクリックイベント
     stopBtn.addEventListener('click', () => {
-        // ★ resetFinishedTimersが音の停止も管理する
-        chrome.runtime.sendMessage({ command: "resetFinishedTimers" });
+        // ★ resetFinishedItemsが音の停止も管理する
+        chrome.runtime.sendMessage({ command: "resetFinishedItems" });
         window.close();
     });
 });

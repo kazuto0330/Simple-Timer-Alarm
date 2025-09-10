@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (stopAllBtn) {
     stopAllBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ command: "resetFinishedTimers" });
+        chrome.runtime.sendMessage({ command: "resetFinishedItems" });
     });
   }
 

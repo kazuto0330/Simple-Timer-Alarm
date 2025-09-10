@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Simple-Timer-Alarm",
   "version": "1.0.0",
-  "description": "複数のタイマーを同時に実行できる拡張機能です。",
+  "description": "シンプルで使いやすいタイマー＆アラーム機能を提供します。タイマーやアラームの追加、削除、名前の変更、時間の変更が簡単に行えます。",
   "icons": {
     "128": "images/icon.png"
   },
@@ -19,11 +19,11 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "サイドパネルを開く"
+    "default_title": "Simple-Timer-Alarmを開く"
   },
   "web_accessible_resources": [
     {
-      "resources": [ "sounds/sound.mp3", "images/play.png", "images/pause.png", "popup.html" ],
+      "resources": [ "sounds/default.mp3", "images/play.png", "images/pause.png", "popup.html" ],
       "matches": [ "<all_urls>" ]
     }
   ]

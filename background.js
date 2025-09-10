@@ -13,10 +13,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     addTimer, deleteTimer, updateTimerTime, updateTimerName, pauseTimer, resumeTimer, resetTimer,
     getTimers: sendDataToSidePanel,
     updateVolume,
-    getFinishedTimers: (d, r) => chrome.storage.local.get('finishedTimers', (res) => r({ success: true, data: res.finishedTimers })),
-    resetFinishedTimers,
+    getFinishedItems: async (d, r) => {
+        const { finishedTimers, finishedAlarms } = await chrome.storage.local.get(['finishedTimers', 'finishedAlarms']);
+        r({ success: true, data: [...(finishedTimers || []), ...(finishedAlarms || [])] });
+    },
+    resetFinishedItems,
     addAlarm, deleteAlarm, updateAlarmTime, updateAlarmName, toggleAlarm,
-    resetFinishedAlarm, // ★ 追加
+    resetFinishedAlarm,
   };
   if (actions[command]) {
     actions[command](data, sendResponse);
@@ -29,22 +32,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 const onFocusChanged = async (windowId) => {
     if (windowId !== chrome.windows.WINDOW_ID_NONE) {
         try {
-            const { finishedTimers } = await chrome.storage.local.get("finishedTimers");
-            if (finishedTimers && finishedTimers.length > 0) {
+            const { finishedTimers, finishedAlarms } = await chrome.storage.local.get(["finishedTimers", "finishedAlarms"]);
+            const hasFinishedItems = (finishedTimers && finishedTimers.length > 0) || (finishedAlarms && finishedAlarms.length > 0);
+
+            if (hasFinishedItems) {
                 await chrome.action.setPopup({ popup: 'popup.html' });
                 await chrome.action.openPopup();
 
-                // ポップアップ表示に成功したらバッジを消してリスナーを削除
                 await chrome.action.setBadgeText({ text: '' });
                 chrome.windows.onFocusChanged.removeListener(onFocusChanged);
             } else {
-                // 完了タイマーがないならリスナーを削除
                 chrome.windows.onFocusChanged.removeListener(onFocusChanged);
             }
         } catch (e) {
             console.error("onFocusChanged: ポップアップの再表示に失敗しました。", e);
-            // 再試行しても失敗する場合は、ループを防ぐためにリスナーを削除する。
-            // バッジは残るのでユーザーは通知に気づける
             chrome.windows.onFocusChanged.removeListener(onFocusChanged);
         }
     }
@@ -75,15 +76,16 @@ function addAlarm() {
 }
 
 async function deleteAlarm({ id }) {
-  const { alarms, finishedTimers } = await chrome.storage.local.get(["alarms", "finishedTimers"]);
+  const { alarms, finishedAlarms } = await chrome.storage.local.get(["alarms", "finishedAlarms"]);
   delete alarms[id];
-  const updatedFinished = (finishedTimers || []).filter(t => t.id !== id);
+  const updatedFinished = (finishedAlarms || []).filter(t => t.id !== id);
   
-  await chrome.storage.local.set({ alarms, finishedTimers: updatedFinished });
+  await chrome.storage.local.set({ alarms, finishedAlarms: updatedFinished });
   sendDataToSidePanel();
   chrome.alarms.clear(id);
 
-  if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
+  const { finishedTimers } = await chrome.storage.local.get(["finishedTimers"]);
+  if (updatedFinished.length === 0 && (finishedAlarms || []).length > 0 && (finishedTimers || []).length === 0) {
     await clearFinishedState();
   }
 }
@@ -148,7 +150,9 @@ async function deleteTimer({ id }) {
   await chrome.storage.local.set({ timers, finishedTimers: updatedFinished });
   sendDataToSidePanel();
   chrome.alarms.clear(id);
-  if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
+
+  const { finishedAlarms } = await chrome.storage.local.get(["finishedAlarms"]);
+  if (updatedFinished.length === 0 && (finishedTimers || []).length > 0 && (finishedAlarms || []).length === 0) {
     await clearFinishedState();
   }
 }
@@ -162,7 +166,9 @@ async function resetTimer({ id }) {
         const updatedFinished = (finishedTimers || []).filter(t => t.id !== id);
         await chrome.storage.local.set({ timers, finishedTimers: updatedFinished });
         sendDataToSidePanel();
-        if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
+        
+        const { finishedAlarms } = await chrome.storage.local.get(["finishedAlarms"]);
+        if (updatedFinished.length === 0 && (finishedTimers || []).length > 0 && (finishedAlarms || []).length === 0) {
             await clearFinishedState();
         }
     }
@@ -170,10 +176,11 @@ async function resetTimer({ id }) {
 
 // --- アラームハンドラ ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-    const { timers, alarms, volume, finishedTimers } = await chrome.storage.local.get(["timers", "alarms", "volume", "finishedTimers"]);
+    const { timers, alarms, volume, finishedTimers, finishedAlarms } = await chrome.storage.local.get(["timers", "alarms", "volume", "finishedTimers", "finishedAlarms"]);
     
     let finishedItem = null;
     let storageUpdates = {};
+    let newFinishedList;
 
     if (alarm.name.startsWith('timer_')) {
         const timer = timers[alarm.name];
@@ -183,26 +190,33 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
             timer.endTime = null;
             finishedItem = { id: timer.id, name: timer.name, type: 'timer' };
             storageUpdates.timers = timers;
+            const currentFinished = finishedTimers || [];
+            newFinishedList = [...currentFinished.filter(t => t.id !== finishedItem.id), finishedItem];
+            storageUpdates.finishedTimers = newFinishedList;
         }
     } else if (alarm.name.startsWith('alarm_')) {
         const userAlarm = alarms[alarm.name];
         if (userAlarm && userAlarm.isActive) {
             finishedItem = { id: userAlarm.id, name: userAlarm.name, type: 'alarm' };
+            const currentFinished = finishedAlarms || [];
+            newFinishedList = [...currentFinished.filter(t => t.id !== finishedItem.id), finishedItem];
+            storageUpdates.finishedAlarms = newFinishedList;
         }
     }
 
     if (finishedItem) {
+        const allFinishedItems = [...(finishedTimers || []), ...(finishedAlarms || [])];
         const isAlarm = finishedItem.type === 'alarm';
-        if ((finishedTimers || []).length === 0) {
+        if (allFinishedItems.length === 0) { // Play sound only if this is the first finished item
             playSound(volume, isAlarm);
         }
-        const newFinishedList = [...(finishedTimers || []).filter(t => t.id !== finishedItem.id), finishedItem];
-        storageUpdates.finishedTimers = newFinishedList;
         
         await chrome.storage.local.set(storageUpdates);
         
+        const combinedFinishedList = [...(storageUpdates.finishedTimers || finishedTimers || []), ...(storageUpdates.finishedAlarms || finishedAlarms || [])];
+
         sendDataToSidePanel();
-        chrome.runtime.sendMessage({ command: "updateFinishedList", data: newFinishedList }).catch(e=>{});
+        chrome.runtime.sendMessage({ command: "updateFinishedList", data: combinedFinishedList }).catch(e=>{});
 
         try {
             await chrome.action.setPopup({ popup: 'popup.html' });
@@ -210,7 +224,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         } catch (e) {
             if (e.message.includes("Could not find an active browser window")) {
                 console.log("アクティブなウィンドウがないためポップアップを開けませんでした。フォーカス時に再試行します。");
-                // 代替案としてバッジを表示
                 await chrome.action.setBadgeText({ text: '!' });
                 await chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
 
@@ -244,21 +257,53 @@ async function resetFinishedTimers() {
 }
 
 // ★ 新設
+async function resetFinishedItems() {
+    const { finishedTimers, finishedAlarms, timers, alarms } = await chrome.storage.local.get(["finishedTimers", "finishedAlarms", "timers", "alarms"]);
+    
+    if ((finishedTimers && finishedTimers.length > 0) || (finishedAlarms && finishedAlarms.length > 0)) {
+        (finishedTimers || []).forEach(finished => {
+            if (timers[finished.id]) {
+                timers[finished.id].remainingTime = timers[finished.id].originalDuration;
+            }
+        });
+        (finishedAlarms || []).forEach(finished => {
+            if (alarms[finished.id]) {
+                alarms[finished.id].isActive = false;
+                chrome.alarms.clear(finished.id);
+            }
+        });
+
+        await chrome.storage.local.set({ timers, alarms, finishedTimers: [], finishedAlarms: [] });
+        sendDataToSidePanel();
+    }
+    await clearFinishedState();
+}
+
+// ★ 新設
 async function resetFinishedAlarm({ id }) {
-    const { finishedTimers, alarms } = await chrome.storage.local.get(["finishedTimers", "alarms"]);
-    const updatedFinished = (finishedTimers || []).filter(t => t.id !== id);
+    const { finishedAlarms, alarms } = await chrome.storage.local.get(["finishedAlarms", "alarms"]);
+    const updatedFinished = (finishedAlarms || []).filter(t => t.id !== id);
 
     if (alarms && alarms[id]) {
         alarms[id].isActive = false;
         chrome.alarms.clear(id);
     }
 
-    await chrome.storage.local.set({ finishedTimers: updatedFinished, alarms });
+    await chrome.storage.local.set({ finishedAlarms: updatedFinished, alarms });
     sendDataToSidePanel();
 
-    if (updatedFinished.length === 0 && (finishedTimers || []).length > 0) {
+    const { finishedTimers } = await chrome.storage.local.get(["finishedTimers"]);
+    if (updatedFinished.length === 0 && (finishedAlarms || []).length > 0 && (finishedTimers || []).length === 0) {
         await clearFinishedState();
     }
+}
+
+function sendDataToSidePanel() {
+  chrome.storage.local.get(["timers", "alarms", "finishedTimers", "finishedAlarms"], ({ timers, alarms, finishedTimers, finishedAlarms }) => {
+    const combinedFinished = [...(finishedTimers || []), ...(finishedAlarms || [])];
+    chrome.runtime.sendMessage({ command: "updateData", data: { timers: timers || {}, alarms: alarms || {}, finishedTimers: combinedFinished } })
+    .catch(e => { if (!e.message.includes("Receiving end does not exist")) console.error(e); });
+  });
 }
 
 function sendDataToSidePanel() {
@@ -277,7 +322,7 @@ function resumeTimer({ id }) { chrome.storage.local.get("timers", ({ timers = {}
 function stopSound() { chrome.runtime.sendMessage({ command: 'stopSound' }).catch(e=>{}); }
 function updateVolume({ volume }) { chrome.storage.local.set({ volume }); }
 async function playSound(volume, loop = false) {
-    const source = 'sounds/sound.mp3';
+    const source = 'sounds/default.mp3';
     const offscreenData = { command: 'playSound', source, volume, loop };
     if (await chrome.offscreen.hasDocument()) {
         chrome.runtime.sendMessage(offscreenData).catch(e=>{});
