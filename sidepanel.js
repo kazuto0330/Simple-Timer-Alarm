@@ -141,8 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         nextAlarmMessage.innerHTML = `
-          <div class="next-alarm-name">”${escapeHTML(nextAlarm.name)}”</div>
-          <div class="next-alarm-time">が${timeString}後に設定されています。</div>
+          <div class="next-alarm-name">${escapeHTML(nextAlarm.name)}</div>
+          <div class="next-alarm-time">${timeString}後に設定されています。</div>
         `;
         nextAlarmMessage.classList.add('visible');
     } else {
