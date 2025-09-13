@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (items && items.length > 0) {
             items.forEach(item => {
                 const el = document.createElement('div');
-                el.className = 'finished-item';
+                el.className = 'finished-card';
                 if (item.type === 'alarm') {
                     el.textContent = `「${item.name}」の時間です`;
                 } else {
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
             stopBtn.disabled = false;
         } else {
             const item = document.createElement('div');
-            item.className = 'finished-item';
+            item.className = 'finished-card';
             item.textContent = "終了したタイマーやアラームはありません";
             listElement.appendChild(item);
             stopBtn.disabled = true;
