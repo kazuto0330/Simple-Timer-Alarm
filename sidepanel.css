@@ -5,13 +5,13 @@ body, html { margin: 0; padding: 12px; font-family: var(--font-family); backgrou
   opacity: 0.5;
   border: 2px dashed var(--primary-color);
 }
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header { display: flex; justify-content: space-between; align-items: center; user-select: none; }
 h1 { font-size: 1.4em; margin: 0; }
 #add-timer-btn { font-size: 24px; font-weight: bold; width: 40px; height: 40px; border-radius: 50%; border: none; background-color: var(--primary-color); color: white; cursor: pointer; transition: background-color 0.2s; }
 #add-timer-btn:hover { background-color: #1e90ff; }
 .controls-container { padding: 15px 5px; }
 .volume-control { display: flex; align-items: center; gap: 10px; }
-.volume-icon { font-size: 1.2em; }
+.volume-icon { font-size: 1.2em; user-select: none; }
 #volume-slider { width: 100%; cursor: pointer; }
 #timers-container { display: flex; flex-direction: column; gap: 15px; }
 
