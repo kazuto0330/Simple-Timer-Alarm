@@ -4,13 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.runtime.connect({ name: "sidepanel" });
 
   const timersContainer = document.getElementById("timers-container");
+  const alarmsContainer = document.getElementById("alarms-container");
   const addTimerBtn = document.getElementById("add-timer-btn");
   const volumeSlider = document.getElementById("volume-slider");
   const timerModeBtn = document.getElementById("timer-mode-btn");
   const alarmModeBtn = document.getElementById("alarm-mode-btn");
   const timerSection = document.getElementById("timer-section");
   const alarmSection = document.getElementById("alarm-section");
-  const alarmsContainer = document.getElementById("alarms-container");
   const nextAlarmMessage = document.getElementById('next-alarm-message');
   
   const finishedSection = document.getElementById('finished-section');
@@ -59,6 +59,45 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   volumeSlider.addEventListener("input", (e) => chrome.runtime.sendMessage({ command: "updateVolume", data: { volume: parseInt(e.target.value, 10) } }));
   
+  // --- Drag and Drop Logic ---
+  [timersContainer, alarmsContainer].forEach(container => {
+    container.addEventListener('dragover', e => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(container, e.clientY);
+        const draggable = document.querySelector('.dragging');
+        if (draggable) {
+            if (afterElement == null) {
+                container.appendChild(draggable);
+            } else {
+                container.insertBefore(draggable, afterElement);
+            }
+        }
+    });
+  });
+
+  function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll('.timer-card:not(.dragging), .alarm-card:not(.dragging)')];
+
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+              return { offset: offset, element: child };
+          } else {
+              return closest;
+          }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  function updateOrder(type) {
+      const container = type === 'timer' ? timersContainer : alarmsContainer;
+      const selector = type === 'timer' ? '.timer-card' : '.alarm-card';
+      const cards = container.querySelectorAll(selector);
+      const orderIds = Array.from(cards).map(c => c.dataset.id);
+      chrome.runtime.sendMessage({ command: "reorderItems", data: { type, orderIds } });
+  }
+  // ---------------------------
+
   chrome.runtime.onMessage.addListener((request) => {
     if (request.command === "updateData") {
       const { timers, alarms, finishedTimers } = request.data;
@@ -156,7 +195,12 @@ document.addEventListener('DOMContentLoaded', () => {
     alarmsContainer.querySelectorAll('.alarm-card').forEach(card => existingCards.set(card.dataset.id, card));
     const renderedIds = new Set();
 
-    const sortedIds = Object.keys(alarms).sort((a, b) => a.localeCompare(b));
+    const sortedIds = Object.keys(alarms).sort((a, b) => {
+        const orderA = alarms[a].order !== undefined ? alarms[a].order : Infinity;
+        const orderB = alarms[b].order !== undefined ? alarms[b].order : Infinity;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.localeCompare(b);
+    });
 
     for (const id of sortedIds) {
         renderedIds.add(id);
@@ -164,6 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const isFinished = finishedIds.has(id);
         if (editingState.id === id) continue;
         if (existingCards.has(id)) {
+            // Re-append to ensure DOM order matches sorted order
+            alarmsContainer.appendChild(existingCards.get(id));
             updateAlarmCard(existingCards.get(id), alarm, isFinished);
         } else {
             const newCard = createAlarmCard(alarm, isFinished);
@@ -178,6 +224,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement("div");
       card.className = "alarm-card";
       card.dataset.id = alarm.id;
+      card.draggable = true;
+      card.addEventListener('dragstart', () => { card.classList.add('dragging'); });
+      card.addEventListener('dragend', () => { card.classList.remove('dragging'); updateOrder('alarm'); });
       updateAlarmCard(card, alarm, isFinished);
       return card;
   }
@@ -229,7 +278,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderTimers(timers, finishedTimers) {
     const finishedIds = new Set((finishedTimers || []).map(t => t.id));
-    const sortedIds = Object.keys(timers).sort((a, b) => a.localeCompare(b));
+    const sortedIds = Object.keys(timers).sort((a, b) => {
+        const orderA = timers[a].order !== undefined ? timers[a].order : Infinity;
+        const orderB = timers[b].order !== undefined ? timers[b].order : Infinity;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.localeCompare(b);
+    });
     const existingCards = new Map();
     timersContainer.querySelectorAll('.timer-card').forEach(card => existingCards.set(card.dataset.id, card));
     const renderedIds = new Set();
@@ -239,6 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const timer = timers[id];
         if (editingState.id === id) continue;
         if (existingCards.has(id)) {
+            timersContainer.appendChild(existingCards.get(id)); // Re-append for sorting
             updateCard(existingCards.get(id), timer, finishedIds.has(id));
         } else {
             const newCard = createCard(timer, finishedIds.has(id));
@@ -253,6 +308,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement("div");
       card.className = "timer-card";
       card.dataset.id = timer.id;
+      card.draggable = true;
+      card.addEventListener('dragstart', () => { card.classList.add('dragging'); });
+      card.addEventListener('dragend', () => { card.classList.remove('dragging'); updateOrder('timer'); });
       updateCard(card, timer, isFinished);
       return card;
   }

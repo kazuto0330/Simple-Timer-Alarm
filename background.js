@@ -1,6 +1,5 @@
 // background.js
 
-// (ファイルの先頭部分は変更なしのため省略)
 let isSidePanelOpen = false;
 chrome.runtime.onInstalled.addListener((details) => { if (details.reason === 'install') { chrome.storage.local.set({ timers: {}, alarms: {}, volume: 50, finishedTimers: [] }); addTimer({ minutes: 3 }); } });
 chrome.action.onClicked.addListener((tab) => { chrome.sidePanel.open({ windowId: tab.windowId }); });
@@ -20,6 +19,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     resetFinishedItems,
     addAlarm, deleteAlarm, updateAlarmTime, updateAlarmName, toggleAlarm,
     resetFinishedAlarm,
+    reorderItems,
   };
   if (actions[command]) {
     actions[command](data, sendResponse);
@@ -65,11 +65,15 @@ function addAlarm() {
   chrome.storage.local.get("alarms", ({ alarms = {} }) => {
     const newId = `alarm_${Date.now()}`;
     const alarmCount = Object.keys(alarms).length;
+    let maxOrder = 0;
+    Object.values(alarms).forEach(a => { if(a.order && a.order > maxOrder) maxOrder = a.order; });
+
     alarms[newId] = {
       id: newId,
       name: `アラーム ${alarmCount + 1}`,
       time: "00:00",
       isActive: false,
+      order: maxOrder + 1,
     };
     chrome.storage.local.set({ alarms }, sendDataToSidePanel);
   });
@@ -256,7 +260,6 @@ async function resetFinishedTimers() {
     await clearFinishedState();
 }
 
-// ★ 新設
 async function resetFinishedItems() {
     const { finishedTimers, finishedAlarms, timers, alarms } = await chrome.storage.local.get(["finishedTimers", "finishedAlarms", "timers", "alarms"]);
     
@@ -279,7 +282,6 @@ async function resetFinishedItems() {
     await clearFinishedState();
 }
 
-// ★ 新設
 async function resetFinishedAlarm({ id }) {
     const { finishedAlarms, alarms } = await chrome.storage.local.get(["finishedAlarms", "alarms"]);
     const updatedFinished = (finishedAlarms || []).filter(t => t.id !== id);
@@ -298,6 +300,22 @@ async function resetFinishedAlarm({ id }) {
     }
 }
 
+function reorderItems({ type, orderIds }) {
+    const storageKey = type === 'timer' ? 'timers' : 'alarms';
+    chrome.storage.local.get(storageKey, (itemsWrapper) => {
+        const items = itemsWrapper[storageKey];
+        if (!items) return;
+        
+        orderIds.forEach((id, index) => {
+            if (items[id]) {
+                items[id].order = index;
+            }
+        });
+        
+        chrome.storage.local.set({ [storageKey]: items }, sendDataToSidePanel);
+    });
+}
+
 function sendDataToSidePanel() {
   chrome.storage.local.get(["timers", "alarms", "finishedTimers", "finishedAlarms"], ({ timers, alarms, finishedTimers, finishedAlarms }) => {
     const combinedFinished = [...(finishedTimers || []), ...(finishedAlarms || [])];
@@ -306,15 +324,26 @@ function sendDataToSidePanel() {
   });
 }
 
-function sendDataToSidePanel() {
-  chrome.storage.local.get(["timers", "alarms", "finishedTimers"], ({ timers, alarms, finishedTimers }) => {
-    chrome.runtime.sendMessage({ command: "updateData", data: { timers: timers || {}, alarms: alarms || {}, finishedTimers: finishedTimers || [] } })
-    .catch(e => { if (!e.message.includes("Receiving end does not exist")) console.error(e); });
-  });
-}
+function addTimer(data) {
+    chrome.storage.local.get("timers", ({ timers = {} }) => {
+        const newId = `timer_${Date.now()}`;
+        const timerCount = Object.keys(timers).length;
+        let maxOrder = 0;
+        Object.values(timers).forEach(t => { if(t.order && t.order > maxOrder) maxOrder = t.order; });
 
-// (省略された関数は変更なし)
-function addTimer(data) { chrome.storage.local.get("timers", ({ timers = {} }) => { const newId = `timer_${Date.now()}`; const timerCount = Object.keys(timers).length; const durationMs = (data.minutes || 3) * 60 * 1000; timers[newId] = { id: newId, name: `タイマー ${timerCount + 1}`, originalDuration: durationMs, remainingTime: durationMs, isRunning: false, endTime: null, }; chrome.storage.local.set({ timers }, sendDataToSidePanel); }); }
+        const durationMs = (data.minutes || 3) * 60 * 1000;
+        timers[newId] = {
+            id: newId,
+            name: `タイマー ${timerCount + 1}`,
+            originalDuration: durationMs,
+            remainingTime: durationMs,
+            isRunning: false,
+            endTime: null,
+            order: maxOrder + 1
+        };
+        chrome.storage.local.set({ timers }, sendDataToSidePanel);
+    });
+}
 function updateTimerTime({ id, totalSeconds }) { chrome.storage.local.get("timers", ({ timers = {} }) => { if (!timers[id]) return; const durationMs = totalSeconds * 1000; timers[id].originalDuration = durationMs; if (timers[id].isRunning) { const newEndTime = Date.now() + durationMs; timers[id].endTime = newEndTime; chrome.alarms.create(id, { when: newEndTime }); } else { timers[id].remainingTime = durationMs; } chrome.storage.local.set({ timers }, sendDataToSidePanel); }); }
 function updateTimerName({ id, newName }) { chrome.storage.local.get("timers", ({ timers = {} }) => { if (timers[id]) { timers[id].name = newName; chrome.storage.local.set({ timers }, sendDataToSidePanel); } }); }
 function pauseTimer({ id }) { chrome.storage.local.get("timers", ({ timers = {} }) => { const timer = timers[id]; if (timer && timer.isRunning) { const remaining = timer.endTime - Date.now(); timer.remainingTime = remaining > 0 ? remaining : 0; timer.isRunning = false; timer.endTime = null; chrome.alarms.clear(id); chrome.storage.local.set({ timers }, sendDataToSidePanel); } }); }
