@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderAlarms(allAlarms, finishedTimers);
       renderFinishedTimers(finishedTimers);
       updateNextAlarmMessage();
+      updateNextTimerMessage();
       updateInterval();
     }
   });
@@ -136,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       });
       updateNextAlarmMessage();
+      updateNextTimerMessage();
   }
 
   function updateNextAlarmMessage() {
@@ -186,6 +188,36 @@ document.addEventListener('DOMContentLoaded', () => {
         nextAlarmMessage.classList.add('visible');
     } else {
         nextAlarmMessage.classList.remove('visible');
+    }
+  }
+
+  function updateNextTimerMessage() {
+    const nextTimerMessage = document.getElementById('next-timer-message');
+    const now = Date.now();
+    let nextTimer = null;
+    let minRemaining = Infinity;
+
+    Object.values(allTimers).forEach(timer => {
+        if (timer.isRunning) {
+            const remaining = timer.endTime - now;
+            if (remaining > 0 && remaining < minRemaining) {
+                minRemaining = remaining;
+                nextTimer = timer;
+            }
+        }
+    });
+
+    if (nextTimer) {
+        const remainingMs = nextTimer.endTime - now;
+        const timeString = formatTime(remainingMs); // Use existing formatTime helper
+
+        nextTimerMessage.innerHTML = `
+          <div class="next-timer-name">${escapeHTML(nextTimer.name)}</div>
+          <div class="next-timer-time">残り ${timeString}</div>
+        `;
+        nextTimerMessage.classList.add('visible');
+    } else {
+        nextTimerMessage.classList.remove('visible');
     }
   }
 
@@ -317,6 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateCard(card, timer, isFinished) {
       card.classList.toggle('finished', isFinished);
+      card.classList.toggle('active', timer.isRunning);
       const remainingMs = timer.isRunning ? (timer.endTime - Date.now()) : timer.remainingTime;
       const displayTime = formatTime(remainingMs);
       const playPauseClass = isFinished ? 'running' : (timer.isRunning ? 'running' : 'paused');
