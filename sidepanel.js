@@ -410,6 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
     input.select(); 
     if (isTime) { 
         input.addEventListener('input', formatInputAsTime); 
+        input.addEventListener('compositionend', formatInputAsTime);
     } 
     const finishEditing = () => { 
         input.removeEventListener('blur', finishEditing); 
@@ -445,7 +446,10 @@ document.addEventListener('DOMContentLoaded', () => {
     input.addEventListener('keydown', e => e.key === 'Enter' && input.blur()); 
   }
   function formatInputAsTime(e) { 
-    let value = e.target.value.replace(/[^\d]/g, '');
+    if (e.isComposing) return;
+    let value = e.target.value;
+    value = value.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+    value = value.replace(/[^\d]/g, '');
     const isAlarm = editingState.type === 'alarm-time';
     const maxLength = isAlarm ? 4 : 6;
     if (value.length > maxLength) value = value.substring(0, maxLength); 
