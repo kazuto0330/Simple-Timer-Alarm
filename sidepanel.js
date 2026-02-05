@@ -353,11 +353,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const remainingMs = timer.isRunning ? (timer.endTime - Date.now()) : timer.remainingTime;
       const displayTime = formatTime(remainingMs);
       const playPauseClass = isFinished ? 'running' : (timer.isRunning ? 'running' : 'paused');
+      
+      const isInitialState = !timer.isRunning && timer.remainingTime === timer.originalDuration;
+      const showReset = !isFinished && !isInitialState;
+      const resetBtnHtml = showReset ? `<button class="reset-btn" data-id="${timer.id}" title="リセット"></button>` : '';
+
       card.innerHTML = `
         <div class="timer-name" data-id="${timer.id}">${escapeHTML(timer.name)}</div>
         <button class="delete-timer" data-id="${timer.id}">×</button>
         <div class="timer-display" data-id="${timer.id}">${displayTime}</div>
         <div class="timer-actions">
+          ${resetBtnHtml}
           <button class="play-pause-btn ${playPauseClass}" data-id="${timer.id}"></button>
         </div>
       `;
@@ -367,6 +373,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function addEventListenersToCard(card, timer, isFinished) {
     card.querySelector('.delete-timer').addEventListener('click', (e) => handleDelete(e, timer), { once: true });
     card.querySelector('.play-pause-btn').addEventListener('click', (e) => handlePlayPause(e, timer), { once: true });
+    const resetBtn = card.querySelector('.reset-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', (e) => handleReset(e, timer), { once: true });
+    }
     if (!isFinished) {
         card.querySelector('.timer-name').addEventListener('click', handleNameClick, { once: true });
         card.querySelector('.timer-display').addEventListener('click', handleTimeClick, { once: true });
@@ -376,6 +386,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleDelete(e, timer) {
     e.stopPropagation();
     chrome.runtime.sendMessage({ command: "deleteTimer", data: { id: timer.id } });
+  }
+
+  function handleReset(e, timer) {
+    e.stopPropagation();
+    chrome.runtime.sendMessage({ command: "resetTimer", data: { id: timer.id } });
   }
 
   function handlePlayPause(e, timer) {
