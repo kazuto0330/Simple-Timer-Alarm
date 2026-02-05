@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const finishedSection = document.getElementById('finished-section');
   const finishedList = document.getElementById('finished-timers-list');
   const stopAllBtn = document.getElementById('stop-all-btn');
+  const okAllBtn = document.getElementById('ok-all-btn');
 
   let editingState = { id: null, type: null };
   let intervalId = null;
@@ -504,6 +505,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (stopAllBtn) {
     stopAllBtn.addEventListener('click', () => {
         chrome.runtime.sendMessage({ command: "resetFinishedItems" });
+    });
+  }
+
+  if (okAllBtn) {
+    okAllBtn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ command: "stopSoundOnly" });
     });
   }
 

@@ -33,11 +33,37 @@ body {
     align-items: center;
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .title {
     font-size: 1.5em; /* 大きくする */
     font-weight: bold;
     margin: 0;
     color: var(--danger-color-dark);
+}
+
+#ok-btn {
+    background-color: #4dabf7; /* Sidepanel's primary color */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#ok-btn:hover {
+    background-color: #3b8ac4;
+}
+
+#ok-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
 }
 
 #stop-sound-btn {
@@ -54,6 +80,11 @@ body {
 
 #stop-sound-btn:hover {
     background-color: var(--danger-color-dark);
+}
+
+#stop-sound-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
 }
 
 #finished-list {

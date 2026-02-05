@@ -165,9 +165,33 @@ h1 { font-size: 1.4em; margin: 0; }
   border-bottom: none;
 }
 
+.finished-actions {
+  display: flex;
+  gap: 10px;
+}
+
+#ok-all-btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 1.1em;
+  font-weight: bold;
+  color: white;
+  background-color: var(--primary-color);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+#ok-all-btn:hover {
+  background-color: #3b8ac4;
+}
+
 /* すべて停止ボタンのスタイル */
 #stop-all-btn {
-  width: 100%;
+  flex: 1;
   padding: 12px;
   font-size: 1.1em;
   font-weight: bold;

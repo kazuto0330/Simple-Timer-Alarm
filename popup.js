@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const listElement = document.getElementById('finished-list');
     const stopBtn = document.getElementById('stop-sound-btn');
+    const okBtn = document.getElementById('ok-btn');
 
     const renderList = (items) => {
         listElement.innerHTML = ''; // リストをクリア
@@ -16,12 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 listElement.appendChild(el);
             });
             stopBtn.disabled = false;
+            okBtn.disabled = false;
         } else {
             const item = document.createElement('div');
             item.className = 'finished-card';
             item.textContent = "終了したタイマーやアラームはありません";
             listElement.appendChild(item);
             stopBtn.disabled = true;
+            okBtn.disabled = true;
         }
     };
 
@@ -40,6 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ボタンのクリックイベント
+    okBtn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ command: "stopSoundOnly" });
+        window.close();
+    });
+
     stopBtn.addEventListener('click', () => {
         // ★ resetFinishedItemsが音の停止も管理する
         chrome.runtime.sendMessage({ command: "resetFinishedItems" });

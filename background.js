@@ -17,6 +17,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         r({ success: true, data: [...(finishedTimers || []), ...(finishedAlarms || [])] });
     },
     resetFinishedItems,
+    stopSoundOnly,
     addAlarm, deleteAlarm, updateAlarmTime, updateAlarmName, toggleAlarm,
     resetFinishedAlarm,
     reorderItems,
@@ -277,6 +278,24 @@ async function resetFinishedItems() {
         });
 
         await chrome.storage.local.set({ timers, alarms, finishedTimers: [], finishedAlarms: [] });
+        sendDataToSidePanel();
+    }
+    await clearFinishedState();
+}
+
+async function stopSoundOnly() {
+    const { finishedTimers, finishedAlarms, timers, alarms } = await chrome.storage.local.get(["finishedTimers", "finishedAlarms", "timers", "alarms"]);
+    
+    if ((finishedTimers && finishedTimers.length > 0) || (finishedAlarms && finishedAlarms.length > 0)) {
+        (finishedTimers || []).forEach(finished => {
+            if (finished.type === 'timer' && timers[finished.id]) {
+                timers[finished.id].remainingTime = timers[finished.id].originalDuration;
+            }
+        });
+        // アラームの場合は isActive を false にせず、chrome.alarms もクリアしない
+        // これにより、繰り返し設定されているアラームは維持される
+
+        await chrome.storage.local.set({ timers, finishedTimers: [], finishedAlarms: [] });
         sendDataToSidePanel();
     }
     await clearFinishedState();
