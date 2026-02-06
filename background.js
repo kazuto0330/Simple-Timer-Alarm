@@ -168,6 +168,7 @@ async function resetTimer({ id }) {
         timers[id].remainingTime = timers[id].originalDuration;
         timers[id].isRunning = false;
         timers[id].endTime = null;
+        chrome.alarms.clear(id);
         const updatedFinished = (finishedTimers || []).filter(t => t.id !== id);
         await chrome.storage.local.set({ timers, finishedTimers: updatedFinished });
         sendDataToSidePanel();
